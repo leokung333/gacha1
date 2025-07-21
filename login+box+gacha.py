@@ -18,6 +18,7 @@ import hashlib
 import gc
 from pathlib import Path
 import re
+from typing import Dict, Optional
 
 class DeviceState:
     def __init__(self):
@@ -219,9 +220,9 @@ def process_swap_shop(device):
     print(f"\nเริ่มกระบวนการ swap shop สำหรับอุปกรณ์: {device.serial}")
     
     # แสดงเวลาและผู้ใช้งาน
-    current_time = "2025-07-21 08:08:25"  # UTC time
+    current_time = "2025-07-21 08:51:50"  # UTC time
     print(f"Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): {current_time}")
-    print(f"Current User's Login: chirasakxr22")
+    print(f"Current User's Login: leokung333")
     
     # ตัวแปรควบคุมการทำงาน
     found_initial_swap_shop = False
@@ -249,7 +250,12 @@ def process_swap_shop(device):
         for hero_img in hero_images:
             hero_pos = ImgSearchADB(adb_img, f'img/{hero_img}')
             if hero_pos:
-                print(f"\nพบ {hero_img} บนอุปกรณ์ {device.serial}")
+                if hero_img == 'heroo1.png':
+                    print(f"\nพบ {hero_img} (bosslaw) บนอุปกรณ์ {device.serial}")
+                elif hero_img == 'heroo2.png':
+                    print(f"\nพบ {hero_img} (conypanan) บนอุปกรณ์ {device.serial}")
+                elif hero_img == 'heroo3.png':
+                    print(f"\nพบ {hero_img} (brownrock) บนอุปกรณ์ {device.serial}")
                 return True
         return False
 
@@ -260,19 +266,42 @@ def process_swap_shop(device):
     def get_channel_position():
         """อ่านตำแหน่งช่องจาก config.json"""
         try:
-            with open('config.json', 'r') as f:
+            with open('config.json', 'r', encoding='utf-8') as f:
                 config = json.load(f)
                 selected_channel = config.get('channel', 'ch2')
                 
+                if 'channels' not in config:
+                    print("ไม่พบข้อมูลช่องใน config.json")
+                    return None
+                    
+                if selected_channel not in config['channels']:
+                    print(f"ไม่พบข้อมูลช่อง {selected_channel} ใน config.json")
+                    return None
+
+                channel_pos = config['channels'][selected_channel]
+                if not isinstance(channel_pos, list) or len(channel_pos) != 2:
+                    print(f"รูปแบบตำแหน่งช่องไม่ถูกต้อง: {channel_pos}")
+                    return None
+
+                print(f"\nข้อมูลการตั้งค่าช่อง:")
+                print(f"ช่องที่เลือก: {selected_channel}")
+                print(f"ตำแหน่ง X,Y: {channel_pos}")
+                    
                 if selected_channel in ['ch4', 'ch5']:
                     print(f"เลือกช่อง {selected_channel} - เลื่อนหน้าจอขึ้นก่อน")
                     device.shell(f"input swipe 852 316 855 116 600")
                     time.sleep(1)
-                    return config['channels'][selected_channel]
+
+                return channel_pos
                 
-                return config['channels'][selected_channel]
+        except FileNotFoundError:
+            print("ไม่พบไฟล์ config.json")
+            return None
+        except json.JSONDecodeError:
+            print("รูปแบบไฟล์ config.json ไม่ถูกต้อง")
+            return None
         except Exception as e:
-            print(f"ไม่สามารถโหลด config.json: {e}")
+            print(f"เกิดข้อผิดพลาดในการโหลด config.json: {str(e)}")
             return None
 
     # เริ่มต้นด้วยการกด event.png
@@ -409,13 +438,19 @@ def process_swap_shop(device):
                     time.sleep(3)
                     
                     channel_pos = get_channel_position()
-                    if channel_pos:
-                        print(f"กำลังเลือกช่องที่ตำแหน่ง: {channel_pos}")
-                        device.shell(f"input tap {channel_pos[0]} {channel_pos[1]}")
-                        last_click_position = channel_pos
-                        time.sleep(1)
+                    if channel_pos and len(channel_pos) == 2:
+                        print(f"กำลังเลือกช่องที่ตำแหน่ง: X={channel_pos[0]}, Y={channel_pos[1]}")
+                        try:
+                            device.shell(f"input tap {channel_pos[0]} {channel_pos[1]}")
+                            print(f"คลิกที่ตำแหน่ง: {channel_pos[0]}, {channel_pos[1]}")
+                            last_click_position = channel_pos
+                            time.sleep(1)
+                        except Exception as e:
+                            print(f"เกิดข้อผิดพลาดในการคลิก: {str(e)}")
+                            return "tap_error"
                     else:
-                        print("ไม่สามารถโหลดตำแหน่งช่องได้ กรุณาตรวจสอบไฟล์ config.json")
+                        print("ไม่สามารถโหลดตำแหน่งช่องได้หรือตำแหน่งไม่ถูกต้อง กรุณาตรวจสอบไฟล์ config.json")
+                        print(f"ค่าตำแหน่งที่ได้: {channel_pos}")
                         return "config_error"
                     
                     continue
@@ -441,7 +476,6 @@ def process_swap_shop(device):
                         print(f"จบชุดแรก เริ่มชุดที่ 2 ทันทีสำหรับอุปกรณ์ {device.serial}")
                         first_sequence_position = 3
                     continue
-
             # ชุดที่ 2: ทำงานตามลำดับ
             second_sequence = ['stopgacha4.png', 'stopgacha6.png', 'stopgacha2.png']
             if second_sequence_position < len(second_sequence):
@@ -471,19 +505,25 @@ def process_swap_shop(device):
                 if stopgacha4_last_seen:
                     time_waiting = time.time() - stopgacha4_last_seen
                     print(f"Stopgacha4 waiting time: {time_waiting:.1f} seconds")
+                print(f"Current Date and Time (UTC): 2025-07-21 08:53:56")
+                print(f"User: leokung333")
 
             # ทำ Garbage Collection ทุก 5 นาที
             if time.time() % 300 < 1:
                 gc.collect()
+                print("\nPerforming garbage collection...")
+                print(f"Current Date and Time (UTC): 2025-07-21 08:53:56")
+                print(f"User: leokung333")
 
             time.sleep(1)
             
         except Exception as e:
             print(f"เกิดข้อผิดพลาด: {e}")
+            print(f"Current Date and Time (UTC): 2025-07-21 08:53:56")
+            print(f"User: leokung333")
             time.sleep(1)
     
     return "complete"
-
 
 def connect_mumu_devices():
     mumu_ports = find_mumu_ports()
@@ -1301,12 +1341,134 @@ def process_single_file_for_device(device):
         return False
 
 
+# Add this at the top of the file with other imports
+from typing import Dict, Optional
+
+# Add the hero mapping constant
+HERO_MAPPING: Dict[str, str] = {
+    'heroo1.png': 'bosslaw',
+    'heroo2.png': 'conypanan',
+    'heroo3.png': 'brownrock'
+}
+
+def check_hero_images(adb_img) -> Optional[str]:
+    """
+    ฟังก์ชันตรวจสอบการมีอยู่ของ heroo1.png, heroo2.png, หรือ heroo3.png
+    Returns: hero name if found, None otherwise
+    """
+    hero_images = ['heroo1.png', 'heroo2.png', 'heroo3.png']
+    for hero_img in hero_images:
+        hero_pos = ImgSearchADB(adb_img, f'img/{hero_img}')
+        if hero_pos:
+            hero_name = HERO_MAPPING[hero_img]
+            print(f"\nพบ {hero_img} ({hero_name}) ")
+            filename_prefix = f"heroo{hero_images.index(hero_img) + 1}"
+            return hero_name, filename_prefix
+    return None, None
+
+def backup_game_data(device):
+    """Backup game data when a hero image is found"""
+    try:
+        # ค้นหา hero images
+        cap = device.screencap()
+        image = np.frombuffer(cap, dtype=np.uint8)
+        adb_img = cv2.imdecode(image, cv2.IMREAD_COLOR)
+        
+        hero_result = check_hero_images(adb_img)
+        if not hero_result:
+            print(f"ไม่พบ hero images บนอุปกรณ์ {device.serial}")
+            return False
+            
+        hero_name, filename_prefix = hero_result
+
+        # แสดงเวลาและผู้ใช้งาน 
+        current_time = "2025-07-21 09:21:07"  # UTC time
+        print(f"Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): {current_time}")
+        print(f"Current User's Login: leokung333")
+
+        # รับชื่อไฟล์ต้นฉบับจาก device_state (ถ้ามี)
+        original_filename = device_state.original_filenames.get(device.serial)
+
+        # สร้างโฟลเดอร์ backup ถ้ายังไม่มี
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backup-id")
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+            print(f"Created backup directory at: {backup_dir}")
+
+        # สร้างชื่อไฟล์ backup โดยรักษาชื่อเดิมถ้ามี
+        if original_filename:
+            # ดึงส่วนของชื่อจากไฟล์ต้นฉบับ (ไม่รวมนามสกุล)
+            base_name = os.path.splitext(original_filename)[0]
+            # ดึง ID จากชื่อไฟล์เดิม (ถ้ามี)
+            id_match = re.search(r'id(\d+)', base_name)
+            if id_match:
+                next_id = id_match.group(1)
+            else:
+                next_id, _ = get_next_backup_id()
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_filename = f"{base_name}_{timestamp}.xml"
+        else:
+            # ถ้าไม่มีชื่อต้นฉบับ ใช้ชื่อใหม่
+            next_id, _ = get_next_backup_id()
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_filename = f"{hero_name}-id{next_id}_LINE_COCOS_PREF_KEY_{timestamp}.xml"
+
+        backup_path = os.path.join(backup_dir, backup_filename)
+
+        # ค้นหาไฟล์ XML ในเครื่อง
+        source_path = "/data/data/com.linecorp.LGRGS/shared_prefs/_LINE_COCOS_PREF_KEY.xml"
+
+        print(f"\nDevice {device.serial}: === Starting Backup Process ===")
+        print(f"Hero detected: {hero_name}")
+        if original_filename:
+            print(f"Using original filename pattern: {original_filename}")
+        print(f"Backup ID: {next_id}")
+        print(f"Backup path: {backup_path}")
+        print(f"User: leokung333")
+        print(f"Timestamp (UTC): {current_time}")
+
+        # ขอสิทธิ์ root และตั้งค่า permissions
+        device.shell("su -c 'chmod 777 /data/data/com.linecorp.LGRGS/shared_prefs'")
+        device.shell(f"su -c 'chmod 777 {source_path}'")
+
+        # ใช้คำสั่ง adb pull โดยตรง
+        pull_command = f'adb -s {device.serial} pull "{source_path}" "{backup_path}"'
+        result = subprocess.run(
+            pull_command, 
+            shell=True, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        if result.returncode == 0 and os.path.exists(backup_path):
+            file_size = os.path.getsize(backup_path)
+            print(f"\nDevice {device.serial}: === Backup Successful ===")
+            print(f"Hero: {hero_name}")
+            if original_filename:
+                print(f"Original filename: {original_filename}")
+            print(f"Backup ID: {next_id}")
+            print(f"Backup location: {backup_path}")
+            print(f"File size: {file_size} bytes")
+            print(f"User: leokung333")
+            print(f"Timestamp (UTC): {current_time}")
+            return True
+        else:
+            print(f"\nDevice {device.serial}: Backup failed: {result.stderr}")
+            return False
+
+    except Exception as e:
+        print(f"Error during backup: {str(e)}")
+        print(f"Current Date and Time (UTC): {current_time}")
+        print(f"User: leokung333")
+        return False
+
+
 
 
 def backup_failed_game_data(device):
-    """
-    Backup game data when hero1.png is not found to random-Fail folder
-    """
+    """Backup game data when hero image is not found"""
     try:
         # สร้างโฟลเดอร์ random-Fail ถ้ายังไม่มี
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1324,7 +1486,7 @@ def backup_failed_game_data(device):
         # สร้างชื่อไฟล์สำหรับ backup แบบไม่มี timestamp
         if original_filename:
             # ใช้ชื่อไฟล์ต้นฉบับเดิม
-            base_name = os.path.splitext(original_filename)[0]  # ลบนามสกุลไฟล์ออก
+            base_name = os.path.splitext(original_filename)[0]
             backup_filename = f"{base_name}.xml"
         else:
             # ถ้าไม่มีชื่อต้นฉบับ ใช้ชื่อเริ่มต้น
@@ -1363,6 +1525,7 @@ def backup_failed_game_data(device):
         print(f"Error during failed backup: {str(e)}")
         return False
 
+
 def load_channel_config():
     """Load channel configuration from config file"""
     try:
@@ -1389,113 +1552,6 @@ def get_channel_position():
         if channel in config['channels']:
             return config['channels'][channel]
     return None
-
-def backup_game_data(device):
-    """Backup game data with sequential ID naming"""
-    try:
-        # สร้างโฟลเดอร์ backup-id
-        backup_dir = "backup-id"
-        if not os.path.exists(backup_dir):
-            try:
-                os.makedirs(backup_dir)
-            except Exception as e:
-                print(f"Device {device.serial}: ไม่สามารถสร้างโฟลเดอร์ backup-id ได้: {e}")
-                return False
-            
-        # โหลด config สำหรับ filename prefix
-        try:
-            with open('config.json', 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            filename_prefix = config.get('filename_prefix', 'conyfly')
-        except Exception as e:
-            print(f"Device {device.serial}: ไม่สามารถโหลด config.json ได้: {e}")
-            filename_prefix = 'conyfly'
-        
-        # ดึงชื่อไฟล์ต้นฉบับ
-        original_filename = device_state.original_filenames.get(device.serial)
-        if not original_filename:
-            print(f"Device {device.serial}: ไม่พบชื่อไฟล์ต้นฉบับ ใช้ชื่อเริ่มต้น")
-            next_id, _ = get_next_backup_id()
-            backup_filename = f"{filename_prefix}-id{next_id}.xml"
-        else:
-            # ใช้ชื่อไฟล์เดิมและเพิ่ม prefix จาก config
-            filename_without_ext = os.path.splitext(original_filename)[0]
-            backup_filename = f"{filename_prefix}-{filename_without_ext}.xml"
-        
-        backup_path = os.path.join(backup_dir, backup_filename)
-        device_id = device.serial
-        
-        print(f"\nDevice {device.serial}: === ข้อมูล Backup ===")
-        print(f"Device {device.serial}: - ชื่อไฟล์ต้นฉบับ: {original_filename if original_filename else 'ไม่พบ'}")
-        print(f"Device {device.serial}: - ชื่อไฟล์ Backup: {backup_filename}")
-        print(f"Device {device.serial}: - Path: {backup_path}")
-        print(f"Device {device.serial}: - Device ID: {device_id}")
-        
-        # ขอสิทธิ์ root และคัดลอกไฟล์
-        print(f"\nDevice {device.serial}: กำลังขอสิทธิ์ root เพื่อ copy ไฟล์...")
-        try:
-            device.shell("su -c 'chmod 777 /data/data/com.linecorp.LGRGS/shared_prefs/_LINE_COCOS_PREF_KEY.xml'")
-            device.shell("su -c 'chmod 777 /data/data/com.linecorp.LGRGS/shared_prefs'")
-        except Exception as e:
-            print(f"Device {device.serial}: ไม่สามารถขอสิทธิ์ root ได้: {e}")
-
-        print(f"\nDevice {device.serial}: กำลัง Pull ไฟล์...")
-        
-        # ทำการ pull ไฟล์พร้อมการ retry
-        MAX_RETRIES = 3
-        for attempt in range(MAX_RETRIES):
-            try:
-                # ตรวจสอบว่าไฟล์มีอยู่จริงบนอุปกรณ์
-                check_file = device.shell("ls /data/data/com.linecorp.LGRGS/shared_prefs/_LINE_COCOS_PREF_KEY.xml")
-                if "_LINE_COCOS_PREF_KEY.xml" not in check_file:
-                    print(f"Device {device.serial}: ไม่พบไฟล์บนอุปกรณ์")
-                    return False
-
-                # ใช้คำสั่ง adb pull โดยตรง
-                pull_command = f'adb -s {device_id} pull "/data/data/com.linecorp.LGRGS/shared_prefs/_LINE_COCOS_PREF_KEY.xml" "{os.path.abspath(backup_path)}"'
-                result = subprocess.run(
-                    pull_command,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=30
-                )
-                
-                # ตรวจสอบผลลัพธ์
-                if result.returncode == 0 and os.path.exists(backup_path) and os.path.getsize(backup_path) > 0:
-                    print(f"\nDevice {device.serial}: === Backup สำเร็จ ===")
-                    print(f"Device {device.serial}: Backup path: {backup_path}")
-                    print(f"Device {device.serial}: File size: {os.path.getsize(backup_path)} bytes")
-                    print(f"Device {device.serial}: Backup filename: {backup_filename}")
-                    return True
-                else:
-                    error_msg = result.stderr.strip() if result.stderr else "ไม่ทราบสาเหตุ"
-                    print(f"Device {device.serial}: Pull ไม่สำเร็จ (พยายามครั้งที่ {attempt + 1}/{MAX_RETRIES}): {error_msg}")
-                    if attempt < MAX_RETRIES - 1:
-                        print(f"Device {device.serial}: รอ 5 วินาทีก่อนลองใหม่...")
-                        time.sleep(5)
-                    continue
-
-            except subprocess.TimeoutExpired:
-                print(f"Device {device.serial}: Pull timeout (พยายามครั้งที่ {attempt + 1}/{MAX_RETRIES})")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(5)
-                continue
-                
-            except Exception as e:
-                print(f"Device {device.serial}: เกิดข้อผิดพลาดในการ Pull (พยายามครั้งที่ {attempt + 1}/{MAX_RETRIES}): {e}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(5)
-                continue
-
-        print(f"Device {device.serial}: Pull ไม่สำเร็จหลังจากพยายาม {MAX_RETRIES} ครั้ง")
-        return False
-
-    except Exception as e:
-        print(f"Device {device.serial}: เกิดข้อผิดพลาดในการ Backup: {e}")
-        return False
-
 
 
 
