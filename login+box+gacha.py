@@ -590,9 +590,9 @@ def func_7day(device):
     print(f"กำลังตรวจสอบกิจกรรม 7 วันสำหรับอุปกรณ์: {device.serial}")
     
     # ค้นหา 7day.png ก่อน
-    for attempt in range(3):
+    for attempt in range(1):
         try:
-            print(f"\nกำลังค้นหา 7day.png (พยายามครั้งที่ {attempt + 1}/3)")
+            print(f"\nกำลังค้นหา 7day.png (พยายามครั้งที่ {attempt + 1}/1)")
             cap = device.screencap()
             image = np.frombuffer(cap, dtype=np.uint8)
             adb_img = cv2.imdecode(image, cv2.IMREAD_COLOR)
@@ -611,7 +611,7 @@ def func_7day(device):
 
     # วนลูปค้นหา 7day1.png และ ok.png
     no_7day1_count = 0  # นับจำนวนครั้งที่ไม่เจอ 7day1
-    max_no_find = 3     # จำนวนครั้งที่ต้องไม่เจอ 7day1 ติดต่อกันถึงจะออกจากลูป
+    max_no_find = 1     # จำนวนครั้งที่ต้องไม่เจอ 7day1 ติดต่อกันถึงจะออกจากลูป
     
     while True:
         try:
@@ -653,9 +653,9 @@ def func_7day(device):
             time.sleep(1)
 
     # ค้นหา 7day2.png
-    for attempt in range(3):
+    for attempt in range(1):
         try:
-            print(f"\nกำลังค้นหา 7day2.png (พยายามครั้งที่ {attempt + 1}/3)")
+            print(f"\nกำลังค้นหา 7day2.png (พยายามครั้งที่ {attempt + 1}/1)")
             cap = device.screencap()
             image = np.frombuffer(cap, dtype=np.uint8)
             adb_img = cv2.imdecode(image, cv2.IMREAD_COLOR)
@@ -672,9 +672,9 @@ def func_7day(device):
             time.sleep(1)
 
     # สุดท้ายค้นหาและกด event.png
-    for attempt in range(3):
+    for attempt in range(1):
         try:
-            print(f"\nกำลังค้นหา event.png (พยายามครั้งที่ {attempt + 1}/3)")
+            print(f"\nกำลังค้นหา event.png (พยายามครั้งที่ {attempt + 1}/1)")
             cap = device.screencap()
             image = np.frombuffer(cap, dtype=np.uint8)
             adb_img = cv2.imdecode(image, cv2.IMREAD_COLOR)
@@ -1367,7 +1367,6 @@ def check_hero_images(adb_img) -> Optional[str]:
     return None, None
 
 def backup_game_data(device):
-    """Backup game data when a hero image is found"""
     try:
         # ค้นหา hero images
         cap = device.screencap()
@@ -1382,11 +1381,11 @@ def backup_game_data(device):
         hero_name, filename_prefix = hero_result
 
         # แสดงเวลาและผู้ใช้งาน 
-        current_time = "2025-07-21 09:21:07"  # UTC time
+        current_time = "2025-07-21 09:59:44"  # UTC time
         print(f"Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): {current_time}")
         print(f"Current User's Login: leokung333")
 
-        # รับชื่อไฟล์ต้นฉบับจาก device_state (ถ้ามี)
+        # รับชื่อไฟล์ต้นฉบับจาก device_state
         original_filename = device_state.original_filenames.get(device.serial)
 
         # สร้างโฟลเดอร์ backup ถ้ายังไม่มี
@@ -1395,24 +1394,16 @@ def backup_game_data(device):
             os.makedirs(backup_dir)
             print(f"Created backup directory at: {backup_dir}")
 
-        # สร้างชื่อไฟล์ backup โดยรักษาชื่อเดิมถ้ามี
+        # สร้างชื่อไฟล์ backup โดยใส่ hero_name ไว้ข้างหน้า
         if original_filename:
-            # ดึงส่วนของชื่อจากไฟล์ต้นฉบับ (ไม่รวมนามสกุล)
+            # ดึงชื่อไฟล์เดิมโดยตัด .xml ออก
             base_name = os.path.splitext(original_filename)[0]
-            # ดึง ID จากชื่อไฟล์เดิม (ถ้ามี)
-            id_match = re.search(r'id(\d+)', base_name)
-            if id_match:
-                next_id = id_match.group(1)
-            else:
-                next_id, _ = get_next_backup_id()
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"{base_name}_{timestamp}.xml"
+            # สร้างชื่อใหม่โดยเอา hero_name ไว้หน้า ตามด้วย + และชื่อเดิม แล้วปิดท้ายด้วย .xml
+            backup_filename = f"{hero_name}+{base_name}.xml"
         else:
-            # ถ้าไม่มีชื่อต้นฉบับ ใช้ชื่อใหม่
+            # ถ้าไม่มีชื่อต้นฉบับ ใช้ชื่อตาม hero_name
             next_id, _ = get_next_backup_id()
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"{hero_name}-id{next_id}_LINE_COCOS_PREF_KEY_{timestamp}.xml"
+            backup_filename = f"{hero_name}-id{next_id}_LINE_COCOS_PREF_KEY.xml"
 
         backup_path = os.path.join(backup_dir, backup_filename)
 
@@ -1422,8 +1413,8 @@ def backup_game_data(device):
         print(f"\nDevice {device.serial}: === Starting Backup Process ===")
         print(f"Hero detected: {hero_name}")
         if original_filename:
-            print(f"Using original filename pattern: {original_filename}")
-        print(f"Backup ID: {next_id}")
+            print(f"Using hero name + original filename: {backup_filename}")
+        print(f"Backup ID: {next_id if not original_filename else 'using original'}")
         print(f"Backup path: {backup_path}")
         print(f"User: leokung333")
         print(f"Timestamp (UTC): {current_time}")
@@ -1448,7 +1439,7 @@ def backup_game_data(device):
             print(f"Hero: {hero_name}")
             if original_filename:
                 print(f"Original filename: {original_filename}")
-            print(f"Backup ID: {next_id}")
+            print(f"New filename: {backup_filename}")
             print(f"Backup location: {backup_path}")
             print(f"File size: {file_size} bytes")
             print(f"User: leokung333")
@@ -1463,8 +1454,6 @@ def backup_game_data(device):
         print(f"Current Date and Time (UTC): {current_time}")
         print(f"User: leokung333")
         return False
-
-
 
 
 def backup_failed_game_data(device):
